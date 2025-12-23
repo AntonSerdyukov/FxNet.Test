@@ -31,8 +31,22 @@ namespace FxNet.Test.Controllers
                 throw new SecureException("Tree not found");
             }
 
+            if (parentNodeId.HasValue)
+            {
+                var parentNode = await _db.TreeNodes
+                    .FirstOrDefaultAsync(x => x.Id == parentNodeId.Value);
+
+                if (parentNode == null)
+                {
+                    throw new SecureException("Parent node does not exist");
+                }
+                else if (parentNode.Tree.Name != treeName)
+                {
+                    throw new SecureException("Child node doesn't belong to the same tree as its parent");
+                }
+            }
+
             var exists = await _db.TreeNodes.AnyAsync(x =>
-                x.TreeId == tree.Id &&
                 x.ParentNodeId == parentNodeId &&
                 x.Name == nodeName);
 
@@ -88,7 +102,6 @@ namespace FxNet.Test.Controllers
             }
 
             var exists = await _db.TreeNodes.AnyAsync(x =>
-                x.TreeId == node.TreeId &&
                 x.ParentNodeId == node.ParentNodeId &&
                 x.Name == newNodeName &&
                 x.Id != nodeId);

@@ -2,6 +2,8 @@
 using FxNet.Test.Exceptions;
 using FxNet.Test.Helpers;
 using FxNet.Test.Models;
+using System.Text.Json;
+using System.Text;
 
 namespace FxNet.Test.Middleware
 {
@@ -17,9 +19,48 @@ namespace FxNet.Test.Middleware
             {
                 var eventId = EventIdGenerator.NewId();
 
+                var queryParams = context.Request.Query
+                    .ToDictionary(q => q.Key, q => q.Value.ToString());
+
+                context.Request.EnableBuffering();
+
+                string body = string.Empty;
+                if (context.Request.ContentLength > 0)
+                {
+                    context.Request.Body.Position = 0;
+                    using var reader = new StreamReader(
+                        context.Request.Body,
+                        Encoding.UTF8,
+                        detectEncodingFromByteOrderMarks: false,
+                        leaveOpen: true);
+
+                    body = await reader.ReadToEndAsync();
+                    context.Request.Body.Position = 0;
+                }
+
+                var journalText = JsonSerializer.Serialize(new
+                {
+                    request = new
+                    {
+                        method = context.Request.Method,
+                        path = context.Request.Path,
+                        query = queryParams,
+                        body = string.IsNullOrWhiteSpace(body) ? null : body
+                    },
+                    exception = new
+                    {
+                        type = ex.GetType().FullName,
+                        message = ex.Message,
+                        stackTrace = ex.StackTrace
+                    }
+                }, new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+
                 if (ex is SecureException secureEx)
                 {
-                    await LogToJournalAsync(db, eventId, secureEx, isSecure: true);
+                    await LogToJournalAsync(db, eventId, journalText, isSecure: true);
 
                     context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                     context.Response.ContentType = "application/json";
@@ -37,7 +78,7 @@ namespace FxNet.Test.Middleware
                     return;
                 }
 
-                await LogToJournalAsync(db, eventId, ex, isSecure: false);
+                await LogToJournalAsync(db, eventId, journalText, isSecure: false);
 
                 _logger.LogError(ex, "Unhandled exception, EventId={EventId}", eventId);
 
@@ -59,15 +100,13 @@ namespace FxNet.Test.Middleware
         private static async Task LogToJournalAsync(
             AppDbContext db,
             long eventId,
-            Exception ex,
+            string journalText,
             bool isSecure)
         {
-            var text = isSecure ? ex.Message : ex.ToString();
-
             db.Journals.Add(new Journal
             {
                 EventId = eventId,
-                Text = text,
+                Text = journalText,
                 CreatedAt = DateTime.UtcNow
             });
 
