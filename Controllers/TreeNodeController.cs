@@ -18,6 +18,10 @@ namespace FxNet.Test.Controllers
             [FromQuery] long? parentNodeId,
             [FromQuery] string nodeName)
         {
+            if (string.IsNullOrWhiteSpace(treeName))
+            {
+                throw new SecureException("Tree name must be specified");
+            }
 
             if (string.IsNullOrWhiteSpace(nodeName))
             {
