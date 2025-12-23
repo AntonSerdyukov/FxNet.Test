@@ -38,6 +38,7 @@ namespace FxNet.Test.Controllers
             if (parentNodeId.HasValue)
             {
                 var parentNode = await _db.TreeNodes
+                    .Include(x => x.Tree)
                     .FirstOrDefaultAsync(x => x.Id == parentNodeId.Value);
 
                 if (parentNode == null)
