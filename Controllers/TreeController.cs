@@ -1,17 +1,16 @@
-﻿using FxNet.Test.Data;
-using FxNet.Test.DTO;
+﻿using FxNet.Test.DTO;
 using FxNet.Test.Exceptions;
+using FxNet.Test.Interfaces;
 using FxNet.Test.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FxNet.Test.Controllers
 {
     [Authorize]
     [ApiController]
     [Route("api.user.tree")]
-    public class TreeController(AppDbContext _db) : ControllerBase
+    public class TreeController(ITreeRepository _repository) : ControllerBase
     {
         private long UserId => long.Parse(User.FindFirst("uid")!.Value);
 
@@ -23,11 +22,7 @@ namespace FxNet.Test.Controllers
                 throw new SecureException("Tree name must be specified");
             }
 
-            var tree = await _db.Trees
-                .Include(x => x.Nodes)
-                    .ThenInclude(x => x.Children)
-                .FirstOrDefaultAsync(x => x.Name == treeName);
-
+            var tree = await _repository.GetTreeAndNodesByNameAsync(treeName);
             if (tree == null)
             {
                 tree = new Tree
@@ -36,8 +31,7 @@ namespace FxNet.Test.Controllers
                     UserId = UserId
                 };
 
-                _db.Trees.Add(tree);
-                await _db.SaveChangesAsync();
+                await _repository.CreateAsync(tree);
 
                 return Ok(new MNode
                 {
@@ -47,10 +41,7 @@ namespace FxNet.Test.Controllers
                 });
             }
 
-            var rootNodes = tree.Nodes
-                .Where(x => x.ParentNodeId == null)
-                .Select(Mapping.Mapper.ToDto)
-                .ToList();
+            var rootNodes = _repository.GetTreeRoots(tree);
 
             return Ok(new MNode
             {

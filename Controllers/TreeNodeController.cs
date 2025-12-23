@@ -1,16 +1,15 @@
-﻿using FxNet.Test.Data;
-using FxNet.Test.Exceptions;
+﻿using FxNet.Test.Exceptions;
+using FxNet.Test.Interfaces;
 using FxNet.Test.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FxNet.Test.Controllers
 {
     [Authorize]
     [ApiController]
     [Route("api.user.tree.node")]
-    public class TreeNodeController(AppDbContext _db) : ControllerBase
+    public class TreeNodeController(ITreeRepository _treeRepository, ITreeNodeRepository _treeNodeRepository) : ControllerBase
     {
         [HttpPost("create")]
         public async Task<IActionResult> CreateAsync(
@@ -28,8 +27,7 @@ namespace FxNet.Test.Controllers
                 throw new SecureException("Node name must be specified");
             }
 
-            var tree = await _db.Trees.FirstOrDefaultAsync(x => x.Name == treeName);
-
+            var tree = await _treeRepository.GetTreeByNameAsync(treeName);
             if (tree == null)
             {
                 throw new SecureException("Tree not found");
@@ -37,10 +35,7 @@ namespace FxNet.Test.Controllers
 
             if (parentNodeId.HasValue)
             {
-                var parentNode = await _db.TreeNodes
-                    .Include(x => x.Tree)
-                    .FirstOrDefaultAsync(x => x.Id == parentNodeId.Value);
-
+                var parentNode = await _treeNodeRepository.GetNodeAndTreeByIdAsync(parentNodeId.Value);
                 if (parentNode == null)
                 {
                     throw new SecureException("Parent node does not exist");
@@ -51,9 +46,7 @@ namespace FxNet.Test.Controllers
                 }
             }
 
-            var exists = await _db.TreeNodes.AnyAsync(x =>
-                x.ParentNodeId == parentNodeId &&
-                x.Name == nodeName);
+            var exists = await _treeNodeRepository.ExistsSiblingWithSameNameAsync(parentNodeId, nodeName);
             if (exists)
             {
                 throw new SecureException("Node name must be unique among siblings");
@@ -65,9 +58,7 @@ namespace FxNet.Test.Controllers
                 ParentNodeId = parentNodeId,
                 Name = nodeName
             };
-
-            _db.TreeNodes.Add(node);
-            await _db.SaveChangesAsync();
+            await _treeNodeRepository.CreateAsync(node);
 
             return Ok();
         }
@@ -75,14 +66,13 @@ namespace FxNet.Test.Controllers
         [HttpPost("delete")]
         public async Task<IActionResult> DeleteAsync([FromQuery] long nodeId)
         {
-            var node = await _db.TreeNodes.FindAsync(nodeId);
+            var node = await _treeNodeRepository.GetNodeByIdAsync(nodeId);
             if (node == null)
             {
                 throw new SecureException("Node not found");
             }
 
-            _db.TreeNodes.Remove(node);
-            await _db.SaveChangesAsync();
+            await _treeNodeRepository.DeleteAsync(node);
 
             return Ok();
         }
@@ -92,7 +82,7 @@ namespace FxNet.Test.Controllers
             [FromQuery] long nodeId,
             [FromQuery] string newNodeName)
         {
-            var node = await _db.TreeNodes.FindAsync(nodeId);
+            var node = await _treeNodeRepository.GetNodeByIdAsync(nodeId);
             if (node == null)
             {
                 throw new SecureException("Node not found");
@@ -103,17 +93,13 @@ namespace FxNet.Test.Controllers
                 throw new SecureException("New node name must be specified");
             }
 
-            var exists = await _db.TreeNodes.AnyAsync(x =>
-                x.ParentNodeId == node.ParentNodeId &&
-                x.Name == newNodeName &&
-                x.Id != nodeId);
+            var exists = await _treeNodeRepository.ExistsSiblingWithSameNameAsync(node.ParentNodeId, newNodeName, nodeId);
             if (exists)
             {
                 throw new SecureException("Node name must be unique among siblings");
             }
 
-            node.Name = newNodeName;
-            await _db.SaveChangesAsync();
+            await _treeNodeRepository.RenameAsync(node, newNodeName);
 
             return Ok();
         }

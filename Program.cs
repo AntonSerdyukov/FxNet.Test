@@ -2,6 +2,7 @@
 using FxNet.Test.Data;
 using FxNet.Test.Interfaces;
 using FxNet.Test.Middleware;
+using FxNet.Test.Repositories;
 using FxNet.Test.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,10 @@ namespace FxNet.Test
             var builder = WebApplication.CreateBuilder(args);
 
             builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+            builder.Services.AddScoped<IUserRepository, UserRepository>();
+            builder.Services.AddScoped<ITreeRepository, TreeRepository>();
+            builder.Services.AddScoped<ITreeNodeRepository, TreeNodeRepository>();
+            builder.Services.AddScoped<IJournalRepository, JournalRepository>();
 
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -81,7 +86,6 @@ namespace FxNet.Test
                 });
 
             builder.Services.AddAuthorization();
-
 
             var app = builder.Build();
 
