@@ -33,8 +33,6 @@ namespace FxNet.Test.Controllers
                 query = query.Where(x => x.Text.Contains(filter.Text));
             }
 
-            var count = await query.CountAsync();
-
             var items = await query
                 .OrderByDescending(x => x.CreatedAt)
                 .Skip(skip)
@@ -50,7 +48,7 @@ namespace FxNet.Test.Controllers
             return Ok(new MRange<MJournalInfo>
             {
                 Skip = skip,
-                Count = count,
+                Count = items.Count,
                 Items = items
             });
         }

@@ -54,7 +54,6 @@ namespace FxNet.Test.Controllers
             var exists = await _db.TreeNodes.AnyAsync(x =>
                 x.ParentNodeId == parentNodeId &&
                 x.Name == nodeName);
-
             if (exists)
             {
                 throw new SecureException("Node name must be unique among siblings");
@@ -77,7 +76,6 @@ namespace FxNet.Test.Controllers
         public async Task<IActionResult> DeleteAsync([FromQuery] long nodeId)
         {
             var node = await _db.TreeNodes.FindAsync(nodeId);
-
             if (node == null)
             {
                 throw new SecureException("Node not found");
@@ -94,23 +92,21 @@ namespace FxNet.Test.Controllers
             [FromQuery] long nodeId,
             [FromQuery] string newNodeName)
         {
-            if (string.IsNullOrWhiteSpace(newNodeName))
-            {
-                throw new SecureException("New node name must be specified");
-            }
-
             var node = await _db.TreeNodes.FindAsync(nodeId);
-
             if (node == null)
             {
                 throw new SecureException("Node not found");
+            }
+
+            if (string.IsNullOrWhiteSpace(newNodeName))
+            {
+                throw new SecureException("New node name must be specified");
             }
 
             var exists = await _db.TreeNodes.AnyAsync(x =>
                 x.ParentNodeId == node.ParentNodeId &&
                 x.Name == newNodeName &&
                 x.Id != nodeId);
-
             if (exists)
             {
                 throw new SecureException("Node name must be unique among siblings");
